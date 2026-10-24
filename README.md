@@ -134,6 +134,48 @@ cp agent/opencode.json <your-project>/.opencode.json   # adjust paths
 opencode   # then: "use tinypraxis to investigate data/failing-trace.json"
 ```
 
+## Reproducing the run: `./live.sh`
+
+The agent run above cannot be replayed — the reasoning happened once, in a model.
+`live.sh` is the answer: **the same cycle, no LLM, byte-reproducible.**
+
+```bash
+./live.sh
+# verdicts: Agency.API = Primary Failure, Dashboard.API = Symptom Only
+# coverage: {"judged_every_queued_entity": true, "left_unjudged": "", "queue_drained": true}
+# transcript: out/live-session.json (33 messages)
+```
+
+It spawns `tinypraxis serve` and passes **every** backend explicitly
+(`--rca`, `--tinylink`, `--index`, `--pdg`, `--sources`, `TINYLINK_LOG_STORE`), so
+nothing depends on `PATH` or on an ambient config. It then runs `praxis_begin →
+select → next → step* → judge → update_queue` until the server itself answers
+`Q is empty` — which is treated as the termination signal — and writes the full
+JSON-RPC transcript to `out/live-session.json`.
+
+**What the scripted policy is.** Every step is a fixed rule declared at the top of
+[`scripts/praxis_client.py`](scripts/praxis_client.py):
+
+| | rule |
+|---|---|
+| step policy | ≥2 statement blocks: `Relate b0→b1`, `Discard b1`, `Expand b0`, `Complete` · 1 block: `Expand`, `Complete` · 0 blocks: `Complete` |
+| verdict rule | `failing_hops > 0` → **Primary Failure**, else **Symptom Only** |
+
+It reached the same verdicts as the agent run, and it did so on the **real PDG
+regions** (`block 2 (L23-28)` → `block 3 (L30-43)`) — this run passes `--pdg`, so
+`tiny-rca`'s child `tiny-pdg-cs` is up and `regions_available` is true.
+
+Be precise about what this shows: **the state machine and its gates are
+reproducible**; the *judgement* here is a one-line rule, not reasoning. The two
+runs side by side are exactly the thesis's baseline-vs-constrained comparison —
+`sessions/` holds the reasoning run, `live.sh` holds the mechanical one.
+
+```
+./demo.sh     # do the tools work?            → out/01…05
+./live.sh     # does the cycle replay?        → out/live-session.json
+sessions/     # can an agent reason through it? → inc-tinydemo-02.md
+```
+
 ## Data
 
 | file | origin |
@@ -167,6 +209,14 @@ demodur: `./demo.sh` çalıştırıldığında C# kodundan rota/PDG grafiği (ti
 izden servis grafiği ve `dosya:satır` eşlemesi (tinylink), kalıcı indeks + log
 arama, ve nihayet üç MCP sunucusunun ayağa kalktığı bir ajan denemesi çıkar
 (`out/`).
+
+`./live.sh` ise aynı PRAXIS döngüsünü **model olmadan, birebir tekrarlanabilir**
+olarak koşar: `begin → select → next → step → judge → update_queue` sunucunun
+`Q is empty` yanıtına kadar, adım adım gerçek PDG blokları üzerinde; transkript
+`out/live-session.json` dosyasına yazılır. Kararlar ajan koşusuyla aynıdır
+(`Agency.API = Primary Failure`, `Dashboard.API = Symptom Only`) — fark,
+akıl yürütmenin bir satırlık kural olmasıdır; tezde **mekanik taban** ile
+**ajan koşusu** arasındaki karşılaştırma tam buradan kurulur.
 
 `sessions/inc-tinydemo-02.md` dosyası, bir ajanın PRAXIS durum makinesini
 `begin → select → step → judge → queue → report` şeklinde **hatasız** tamamladığı
