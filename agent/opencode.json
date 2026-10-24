@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "tinylink": {
+      "type": "local",
+      "command": ["../tinylink/target/release/tinylink", "serve", "--index", "./out/tinylink.db"],
+      "enabled": true,
+      "environment": { "TINYLINK_LOG_STORE": "./out/tinylink.logs.db" }
+    },
+    "tiny_rca": {
+      "type": "local",
+      "command": ["../tiny-rca/target/release/tiny-rca", "serve"],
+      "enabled": true,
+      "environment": { "TINYLINK_INDEX": "./out/tinylink.db" }
+    },
+    "tinypraxis": {
+      "type": "local",
+      "command": ["../tinypraxis/target/release/tinypraxis", "serve"],
+      "enabled": true
+    }
+  }
+}
